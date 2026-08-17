@@ -1,0 +1,10 @@
+streamlit
+torch
+torch-geometric
+rdkit
+biopython
+pandas
+numpy
+scipy
+scikit-learn
+plotly
