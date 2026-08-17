@@ -543,7 +543,9 @@ elif page == "Batch Virtual Screening":
         
         use_example = st.session_state.get("use_example_data", False)
 
-        if run_screening:
+        should_run_screening = run_screening or load_example
+
+        if should_run_screening:
             # Build a unified list of (name, bytes) for pocket and ligands,
             # sourced either from user uploads or the bundled examples/ folder.
             if use_example:
