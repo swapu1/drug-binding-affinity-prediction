@@ -530,7 +530,7 @@ elif page == "Batch Virtual Screening":
             st.session_state.use_example_data = True
 
         if st.session_state.get("use_example_data", False):
-            st.info("Using bundled example files: one target pocket + 3 candidate ligands.")
+            st.info("Using bundled example files: one target pocket + the full core-set ligand library.")
 
         st.write("<div style='height:15px;'></div>", unsafe_allow_html=True)
         run_screening = st.button("Run Screening")
@@ -550,23 +550,27 @@ elif page == "Batch Virtual Screening":
             # sourced either from user uploads or the bundled examples/ folder.
             if use_example:
                 example_pocket_path = "examples/example_pocket.pdb"
-                example_ligand_paths = [
-                    "examples/example_ligand_1.mol2",
-                    "examples/example_ligand_2.mol2",
-                    "examples/example_ligand_3.mol2",
-                ]
+                example_ligands_dir = "examples/ligands"
+
                 if not os.path.exists(example_pocket_path):
                     st.error("Example files not found in the repo. Add them under examples/ and redeploy.")
+                    pocket_bytes = None
+                    ligand_items = []
+                elif not os.path.isdir(example_ligands_dir):
+                    st.error("examples/ligands/ folder not found in the repo.")
                     pocket_bytes = None
                     ligand_items = []
                 else:
                     with open(example_pocket_path, "rb") as f:
                         pocket_bytes = f.read()
                     ligand_items = []
-                    for path in example_ligand_paths:
-                        if os.path.exists(path):
-                            with open(path, "rb") as f:
-                                ligand_items.append((os.path.basename(path), f.read()))
+                    ligand_filenames = sorted(os.listdir(example_ligands_dir))
+                    for filename in ligand_filenames:
+                        if filename.endswith(".mol2") or filename.endswith(".sdf"):
+                            full_path = os.path.join(example_ligands_dir, filename)
+                            with open(full_path, "rb") as f:
+                                ligand_items.append((filename, f.read()))
+                    st.caption("Demo mode: screening the full core-set library (" + str(len(ligand_items)) + " ligands) against one bundled target pocket. This may take a minute or two.")
             else:
                 if pocket_file is None or len(ligand_files) == 0:
                     st.warning("Please upload both a target pocket PDB and candidate ligands, or click Load Example Data.")
