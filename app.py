@@ -164,11 +164,31 @@ def build_molecule_graph_from_bytes(file_bytes, file_format):
     mol = None
     if file_format == "mol2":
         mol = Chem.MolFromMol2File(temp_path, sanitize=True)
+        if mol is None:
+            # retry without strict sanitization, then sanitize with error tolerance
+            mol = Chem.MolFromMol2File(temp_path, sanitize=False)
+            if mol is not None:
+                try:
+                    Chem.SanitizeMol(mol, sanitizeOps=Chem.SANITIZE_ALL ^ Chem.SANITIZE_KEKULIZE)
+                except Exception:
+                    mol = None
     else:
         supplier = Chem.SDMolSupplier(temp_path, sanitize=True)
         if len(supplier) > 0:
             mol = supplier[0]
-        del supplier # FIX: Windows file lock
+        if mol is None:
+            # retry without strict sanitization, then sanitize with error tolerance
+            supplier_lenient = Chem.SDMolSupplier(temp_path, sanitize=False)
+            if len(supplier_lenient) > 0:
+                candidate = supplier_lenient[0]
+                if candidate is not None:
+                    try:
+                        Chem.SanitizeMol(candidate, sanitizeOps=Chem.SANITIZE_ALL ^ Chem.SANITIZE_KEKULIZE)
+                        mol = candidate
+                    except Exception:
+                        mol = None
+            del supplier_lenient
+        del supplier  # FIX: Windows file lock
 
     os.remove(temp_path)
 
