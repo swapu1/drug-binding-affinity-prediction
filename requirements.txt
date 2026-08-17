@@ -1,3 +1,13 @@
+
+streamlit
+torch
+torch-geometric
+rdkit
+biopython
+pandas
+numpy
+scipy
+scikit-learn
 streamlit
 torch
 torch-geometric

@@ -1,8 +1,4 @@
-Notepad will ask if you want to create a new file — click Yes. Paste this in:
-
 data/
-graphs/
-*.pt
 temp_ligand.mol2
 temp_ligand.sdf
 temp_pocket.pdb
