@@ -286,6 +286,9 @@ model = load_model()
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "use_example_data" not in st.session_state:
+    st.session_state.use_example_data = False
+
 # --- SIDEBAR NAVIGATION ---
 st.sidebar.markdown("<h2 style='color:#00f2fe; text-align:center;'>🧬 BindAI</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='color:#94A3B8; text-align:center; font-size:0.8rem;'>Binding Affinity Predictor</p>", unsafe_allow_html=True)
@@ -506,6 +509,8 @@ elif page == "Batch Virtual Screening":
             </div>
         ''', unsafe_allow_html=True)
         pocket_file = st.file_uploader("PDB Target File", type=["pdb"], label_visibility="collapsed")
+        if pocket_file is not None:
+            st.session_state.use_example_data = False
         
         st.write("<div style='height:10px;'></div>", unsafe_allow_html=True)
 
@@ -516,7 +521,17 @@ elif page == "Batch Virtual Screening":
             </div>
         ''', unsafe_allow_html=True)
         ligand_files = st.file_uploader("Ligand Library", type=["mol2", "sdf"], accept_multiple_files=True, label_visibility="collapsed")
-        
+
+        st.write("<div style='height:10px;'></div>", unsafe_allow_html=True)
+        st.caption("Don't have your own files? Try a demo run instead:")
+        load_example = st.button("Load Example Data", key="load_example_button")
+
+        if load_example:
+            st.session_state.use_example_data = True
+
+        if st.session_state.get("use_example_data", False):
+            st.info("Using bundled example files: one target pocket + 3 candidate ligands.")
+
         st.write("<div style='height:15px;'></div>", unsafe_allow_html=True)
         run_screening = st.button("Run Screening")
         st.caption("Structural Alert uses RDKit's PAINS + BRENK filters - known problematic "
@@ -526,12 +541,46 @@ elif page == "Batch Virtual Screening":
     with col_right:
         st.markdown('<h3 style="color:#FFF;">Screening Results - Top Hits</h3>', unsafe_allow_html=True)
         
-        if run_screening:
-            if pocket_file is None or len(ligand_files) == 0:
-                st.warning("Please upload both a target pocket PDB and candidate ligands.")
+        use_example = st.session_state.get("use_example_data", False)
+
+        should_run_screening = run_screening or load_example
+
+        if should_run_screening:
+            # Build a unified list of (name, bytes) for pocket and ligands,
+            # sourced either from user uploads or the bundled examples/ folder.
+            if use_example:
+                example_pocket_path = "examples/example_pocket.pdb"
+                example_ligand_paths = [
+                    "examples/example_ligand_1.mol2",
+                    "examples/example_ligand_2.mol2",
+                    "examples/example_ligand_3.mol2",
+                ]
+                if not os.path.exists(example_pocket_path):
+                    st.error("Example files not found in the repo. Add them under examples/ and redeploy.")
+                    pocket_bytes = None
+                    ligand_items = []
+                else:
+                    with open(example_pocket_path, "rb") as f:
+                        pocket_bytes = f.read()
+                    ligand_items = []
+                    for path in example_ligand_paths:
+                        if os.path.exists(path):
+                            with open(path, "rb") as f:
+                                ligand_items.append((os.path.basename(path), f.read()))
+            else:
+                if pocket_file is None or len(ligand_files) == 0:
+                    st.warning("Please upload both a target pocket PDB and candidate ligands, or click Load Example Data.")
+                    pocket_bytes = None
+                    ligand_items = []
+                else:
+                    pocket_bytes = pocket_file.read()
+                    ligand_items = [(lf.name, lf.read()) for lf in ligand_files]
+
+            if pocket_bytes is None or len(ligand_items) == 0:
+                pass  # warning/error already shown above
             else:
                 with st.spinner("Processing GNN Graph Embeddings..."):
-                    pocket_result = build_pocket_graph_from_bytes(pocket_file.read())
+                    pocket_result = build_pocket_graph_from_bytes(pocket_bytes)
                     
                     if pocket_result is None:
                         st.error("Failed to parse protein pocket.")
@@ -539,9 +588,9 @@ elif page == "Batch Virtual Screening":
                         pocket_x, pocket_edge_index = pocket_result
                         results = []
                         
-                        for idx, ligand_file in enumerate(ligand_files):
-                            file_format = "mol2" if ligand_file.name.endswith(".mol2") else "sdf"
-                            mol_res, mol_obj = build_molecule_graph_from_bytes(ligand_file.read(), file_format)
+                        for idx, (ligand_name, ligand_bytes) in enumerate(ligand_items):
+                            file_format = "mol2" if ligand_name.endswith(".mol2") else "sdf"
+                            mol_res, mol_obj = build_molecule_graph_from_bytes(ligand_bytes, file_format)
                             
                             if mol_res is not None:
                                 mol_x, mol_edge_index = mol_res
@@ -556,14 +605,14 @@ elif page == "Batch Virtual Screening":
                                 toxicity_flag = check_toxicity_alerts(mol_obj)
 
                                 results.append({
-                                    "Ligand ID": ligand_file.name,
+                                    "Ligand ID": ligand_name,
                                     "Affinity (pKd)": round(pred, 2),
                                     "Drug-likeness (QED)": qed_score,
                                     "Structural Alert": toxicity_flag
                                 })
                             else:
                                 results.append({
-                                    "Ligand ID": ligand_file.name,
+                                    "Ligand ID": ligand_name,
                                     "Affinity (pKd)": None,
                                     "Drug-likeness (QED)": None,
                                     "Structural Alert": "N/A - parse failed"
