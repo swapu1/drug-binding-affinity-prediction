@@ -570,7 +570,7 @@ elif page == "Batch Virtual Screening":
                             full_path = os.path.join(example_ligands_dir, filename)
                             with open(full_path, "rb") as f:
                                 ligand_items.append((filename, f.read()))
-                    st.caption("Demo mode: screening the full core-set library (" + str(len(ligand_items)) + " ligands) against one bundled target pocket. This may take a minute or two.")
+                    st.caption("Demo mode: screening the full core-set library (" + str(len(ligand_items)) + " ligands) against the bundled target pocket (**1a30**, from the PDBBind CASF benchmark). This may take a minute or two.")
             else:
                 if pocket_file is None or len(ligand_files) == 0:
                     st.warning("Please upload both a target pocket PDB and candidate ligands, or click Load Example Data.")
